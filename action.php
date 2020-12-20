@@ -24,8 +24,8 @@ class action_plugin_conditionalstyle extends DokuWiki_Action_Plugin
     public function register(Doku_Event_Handler $controller)
     {
         $controller->register_hook('PLUGIN_STRUCT_CONFIGPARSER_UNKNOWNKEY', 'BEFORE', $this, 'handle_plugin_struct_configparser_unknownkey');        
-        $controller->register_hook(' PLUGIN_STRUCT_AGGREGATIONTABLE_RENDERRESULTROW', 'BEFORE', $this, 'handle_plugin_struct_aggregationtable_renderresultrow');        
-        $controller->register_hook(' PLUGIN_STRUCT_AGGREGATIONTABLE_RENDERRESULTROW', 'AFTER', $this, 'handle_plugin_struct_aggregationtable_renderresultrow');
+        $controller->register_hook(' PLUGIN_STRUCT_AGGREGATIONTABLE_RENDERRESULTROW', 'BEFORE', $this, 'handle_plugin_struct_aggregationtable_renderresultrow_before');        
+        $controller->register_hook(' PLUGIN_STRUCT_AGGREGATIONTABLE_RENDERRESULTROW', 'AFTER', $this, 'handle_plugin_struct_aggregationtable_renderresultrow_after');
    
     }
 
@@ -42,9 +42,10 @@ class action_plugin_conditionalstyle extends DokuWiki_Action_Plugin
      */
     public function handle_plugin_struct_configparser_unknownkey(Doku_Event $event, $param)
     {
-        // Retrieve the key and data passed for this agregation line
+        // Retrieve the key and data and value passed for this agregation line
         $data = $event->data;
         $key = $data['key'];
+        $val = trim($data['val']);
 
         // If the key is not associated with this plugin, return instantly
         if ($key != 'condstyle') return;
@@ -53,8 +54,19 @@ class action_plugin_conditionalstyle extends DokuWiki_Action_Plugin
         $event->preventDefault();
         $event->stopPropagation();
 
-        $val = trim($data['val']);
-        $data['config'][$key] = $val;
+        // Try to parse value into ternary statement and show error message if it does not work out
+        if(!preg_match('/\s*[a-zA-z]+\s*(=|<|>|!=)\s*[a-zA-z0-9]+\s*\?\s*".+"\s*:\s*.+"/',$val)){
+            msg("condstyle: $val is not correct", -1);
+            return;
+        }
+
+        // split value
+        $condition = preg_split("/\s*\?\s*/",$val,2)[0];
+        $styles = preg_split("/\s*\?\s*/",$val,2)[1];
+        $style_true = trim(preg_split('/"\s*:\s*"/',$styles)[0],'"');
+        $style_false = trim(preg_split('/"\s*:\s*"/',$styles)[1],'"');
+        
+        $data['config'][$key] = [$condition,$style_true,$style_false];
     }
 
      /**
@@ -68,7 +80,7 @@ class action_plugin_conditionalstyle extends DokuWiki_Action_Plugin
      *
      * @return void
      */
-    public function handle_plugin_struct_aggregationtable_renderresultrow(Doku_Event $event, $param)
+    public function handle_plugin_struct_aggregationtable_renderresultrow_before(Doku_Event $event, $param)
     {
     }
 
@@ -83,7 +95,7 @@ class action_plugin_conditionalstyle extends DokuWiki_Action_Plugin
      *
      * @return void
      */
-    public function handle_plugin_struct_aggregationtable_renderresultrow(Doku_Event $event, $param)
+    public function handle_plugin_struct_aggregationtable_renderresultrow_after(Doku_Event $event, $param)
     {
     }
 
