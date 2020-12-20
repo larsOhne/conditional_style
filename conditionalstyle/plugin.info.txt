@@ -1,0 +1,7 @@
+base   conditionalstyle
+author Lars Ohnemus
+email  lars.ohnemus@mu-zero.de
+date   2020-12-20
+name   conditionalstyle plugin
+desc   A small struct extension plugin that allows the user to style parts of agregations depending on their values
+url    http://mu-zero.de
