@@ -42,10 +42,14 @@ class action_plugin_conditionalstyle extends DokuWiki_Action_Plugin
      */
     public function handle_plugin_struct_configparser_unknownkey(Doku_Event $event, $param)
     {
+        // Retrieve the key and data passed for this agregation line
         $data = $event->data;
         $key = $data['key'];
-        if ($key != 'rowcolor') return;
 
+        // If the key is not associated with this plugin, return instantly
+        if ($key != 'condstyle') return;
+
+        // Else prevent errors and default handling to inject custom code into struct
         $event->preventDefault();
         $event->stopPropagation();
 
