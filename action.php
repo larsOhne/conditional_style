@@ -85,12 +85,20 @@ class action_plugin_conditionalstyle extends DokuWiki_Action_Plugin
         $argument = trim(preg_split("/\s*$operator\s*/",$condition)[1]);
 
         // package parsed command into data
-        $data['config'][$key] = array("operator"    => $operator,
-                                      "column"      => $column,
-                                      "argument"    => $argument,
-                                      "style_true"  => $style_true,
-                                      "style_false" => $style_false
-                                     );
+        $config = array("operator"    => $operator,
+                        "column"      => $column,
+                        "argument"    => $argument,
+                        "style_true"  => $style_true,
+                        "style_false" => $style_false
+                        );
+
+        // Check if condstyle is already existing in data
+        if(!isset($data['config'][$key])){
+            $data['config'][$key] = [];
+        }
+        // Add command to data
+        
+        $data['config'][$key][] = $config; 
     }
 
      /**
@@ -114,66 +122,75 @@ class action_plugin_conditionalstyle extends DokuWiki_Action_Plugin
         // Check if mode is xhtml otherwise return
         if ($mode != 'xhtml') return;
                 
-        // Unpack condition and styles
-        $operator = NULL;
-        $column = NULL;
-        $argument = NULL;
-        $style_true = NULL;
-        $style_false = NULL;
-        extract($data['condstyle']);
 
-        // Check if valid data was send, otherwise return
-        if(!$operator) return;
+        // get all styles
+        $condstyles = $data['condstyle'];
+        if(!isset($condstyles)) return;
+
+        // loop over each style
+        foreach ($condstyles as $stylenum => $style) {
+            
+            // Unpack condition and styles
+            $operator = NULL;
+            $column = NULL;
+            $argument = NULL;
+            extract($style);
+
+            // Check if valid data was send, otherwise move to next style
+            if(!$operator) continue;
 
 
-        // Query struct database to get full schema info (in case the column used for condition is not displayed)
-        /** @var SearchConfig $searchConfig */
-        $searchConfig = $event->data['searchConfig'];
-        $searchConfig_hash = spl_object_hash($searchConfig);
-        if (!isset($this->search_configs[$searchConfig_hash])) {
-            // Add new Entry for this search configuration
-            $this->search_configs[$searchConfig_hash] = [];
+            // Query struct database to get full schema info (in case the column used for condition is not displayed)
+            /** @var SearchConfig $searchConfig */
+            $searchConfig = $event->data['searchConfig'];
+            $searchConfig_hash = spl_object_hash($searchConfig) . $stylenum;
 
-            // Retrieve Column
-            $cond_column = $searchConfig->findColumn($column);
-            //dbg(var_dump($cond_column));
+            if (!isset($this->search_configs[$searchConfig_hash])) {
+                // Add new Entry for this search configuration
+                $this->search_configs[$searchConfig_hash] = [];
 
-            // Add all columns to be sure that all information was retrieved and execute query
-            $searchConfig->addColumn('*');
-            $result = $searchConfig->execute();
+                // Retrieve Column
+                $cond_column = $searchConfig->findColumn($column);
+                //dbg(var_dump($cond_column));
 
-            // Check for each row if the condition matches and add store that information for later use
-            foreach ($result as $rownum => $row) {
-                /** @var Value $value */
-                foreach ($row as $colnum => $value) {
-                    if ($value->getColumn() === $cond_column) {
-                        $row_val = $value->getRawValue();
-                        // check condition
-                        $cond_applies = false;
-                        switch ($operator) {
-                            case '=':
-                                $cond_applies = $row_val == $argument;
-                                break;
-                            case '<':
-                                //TODO not validated
-                                $num_arg = floatval($argument);
-                                $num_row_val = floatval($argument);
-                                $cond_applies = $num_row_val < $num_arg;
-                                break;
-                            default:
-                                msg("condstyle: unknown operator ($operator)", -1);
-                                break;
+                // Add all columns to be sure that all information was retrieved and execute query
+                $searchConfig->addColumn('*');
+                $result = $searchConfig->execute();
+
+                // Check for each row if the condition matches and add store that information for later use
+                foreach ($result as $rownum => $row) {
+                    /** @var Value $value */
+                    foreach ($row as $colnum => $value) {
+                        if ($value->getColumn() === $cond_column) {
+                            $row_val = $value->getRawValue();
+                            // check condition
+                            $cond_applies = false;
+                            switch ($operator) {
+                                case '=':
+                                    $cond_applies = $row_val == $argument;
+                                    break;
+                                case '<':
+                                    //TODO not validated
+                                    $num_arg = floatval($argument);
+                                    $num_row_val = floatval($argument);
+                                    $cond_applies = $num_row_val < $num_arg;
+                                    break;
+                                default:
+                                    msg("condstyle: unknown operator ($operator)", -1);
+                                    break;
+                            }
+
+                            // store condition to inject style later
+                            $this->search_configs[$searchConfig_hash][$rownum] = $cond_applies;
+
+                            break;
                         }
-
-                        // store condition to inject style later
-                        $this->search_configs[$searchConfig_hash][$rownum] = $cond_applies;
-
-                        break;
                     }
                 }
-            }
 
-        }
+            }
+        
+        }// END style loop
 
         // save row start position
         $event->data['rowstart']= mb_strlen($renderer->doc);
@@ -206,28 +223,37 @@ class action_plugin_conditionalstyle extends DokuWiki_Action_Plugin
         $data = $event->data['data'];
         $rownum  = $event->data['rownum'];
         $rowstart = $event->data['rowstart'];
-                
-        // Unpack condition and styles
-        $operator = NULL;
-        $column = NULL;
-        $argument = NULL;
-        $style_true = NULL;
-        $style_false = NULL;
-        extract($data['condstyle']);
 
-        // Check if proper info is available
-        if (!isset($style_true)) return;
-        if (!isset($style_false)) return;
-        if (!$rowstart) return;
-        
+        // get all styles
+        $condstyles = $data['condstyle'];
+        if(!isset($condstyles)) return;
 
-        // Lookup the style condition
-        $searchConfig_hash = spl_object_hash($searchConfig);
-        $cond_applies = $this->search_configs[$searchConfig_hash][$rownum];
-        if (!isset($cond_applies)) return;
+        // String to store all styles
+        $style_tag = "";
 
-        // set the style for this column based on condition
-        $style = $cond_applies ? $style_true : $style_false;
+        // loop over each style
+        foreach ($condstyles as $stylenum => $style) {
+            // Unpack condition and styles
+            $style_true = NULL;
+            $style_false = NULL;
+            extract($style);
+
+            // Check if proper info is available
+            if (!isset($style_true)) continue;
+            if (!isset($style_false)) continue;
+            if (!$rowstart) continue;
+            
+
+            // Lookup the style condition
+            $searchConfig_hash = spl_object_hash($searchConfig) . $stylenum;
+            $cond_applies = $this->search_configs[$searchConfig_hash][$rownum];
+            if (!isset($cond_applies)) continue;
+
+            // set the style for this column based on condition
+            $style_tag .= $cond_applies ? $style_true : $style_false;
+            
+        } // END style loop
+
         
         // split doc to inject styling
         $rest = mb_substr($renderer->doc, 0,  $rowstart);
@@ -239,8 +265,10 @@ class action_plugin_conditionalstyle extends DokuWiki_Action_Plugin
         $tr_tag = mb_substr($row, 0, 3);
         $tr_rest = mb_substr($row, 3);
 
-        if(trim($style) != "")
-            $renderer->doc = $rest . $tr_tag . ' style="'.$style.'" ' . $tr_rest;
+
+        // inject style into document
+        if(trim($style_tag) != "")
+            $renderer->doc = $rest . $tr_tag . ' style="'.$style_tag.'" ' . $tr_rest;
 
 
     }
