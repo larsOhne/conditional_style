@@ -11,9 +11,85 @@ if (!defined('DOKU_INC')) {
     die();
 }
 
+use dokuwiki\plugin\conditionalstyle\meta\Operator;
+
+function make_numeric($value){
+    if(is_numeric($value))
+        return floatval($value);
+    if(is_string($value)){
+        if($value == "now")
+            return time();
+        else
+            return strtotime($value);
+        
+    }
+    else
+        return FALSE;
+}
+
+function equal_func($lhs, $rhs){
+    return $lhs == $rhs;
+}
+
+function nequal_func($lhs, $rhs){
+    return !equal_func($lhs, $rhs);
+}
+
+function less_func($lhs, $rhs){
+    // Parse values to numeric
+    $lhs_num = make_numeric($lhs);
+    $rhs_num = make_numeric($rhs);
+    if($lhs_num === FALSE or $rhs_num === FALSE)
+        return false;
+    else
+        return $lhs_num < $rhs_num;
+}
+
+function leq_func($lhs, $rhs){
+    // Parse values to numeric
+    $lhs_num = make_numeric($lhs);
+    $rhs_num = make_numeric($rhs);
+    if($lhs_num === FALSE or $rhs_num === FALSE)
+        return false;
+    else
+        return $lhs_num <= $rhs_num;
+}
+
+function greater_func($lhs, $rhs){
+    // Parse values to numeric
+    $lhs_num = make_numeric($lhs);
+    $rhs_num = make_numeric($rhs);
+    if($lhs_num === FALSE or $rhs_num === FALSE)
+        return false;
+    else
+        return $lhs_num > $rhs_num;
+}
+
+function greq_func($lhs, $rhs){
+    // Parse values to numeric
+    $lhs_num = make_numeric($lhs);
+    $rhs_num = make_numeric($rhs);
+    if($lhs_num === FALSE or $rhs_num === FALSE)
+        return false;
+    else
+        return $lhs_num >= $rhs_num;
+}
+
+function contains_func($lhs, $rhs){
+    // Check if $lhs is array or string
+    if(is_array($lhs)){
+        return in_array($rhs,$lhs);
+    }else if(is_string($lhs)){
+        return strpos($lhs,$rhs) !== false;
+    }else return false;
+}
+
+
 class action_plugin_conditionalstyle extends DokuWiki_Action_Plugin
 {
     protected $search_configs = [];
+    protected $ops = [];
+
 
     /**
      * Registers a callback function for a given event
@@ -24,6 +100,17 @@ class action_plugin_conditionalstyle extends DokuWiki_Action_Plugin
      */
     public function register(Doku_Event_Handler $controller)
     {
+        $this->ops = [  "="         => new Operator("=","equal_func"),
+                        "!="        => new Operator("!=","nequal_func"),
+                        "not"       => new Operator("not","nequal_func"),
+                        "<"         => new Operator("<","less_func"),
+                        "<="        => new Operator("<=","leq_func"),
+                        ">"         => new Operator(">","greater_func"),
+                        ">="        => new Operator(">=","greq_func"),
+                        "contains"  => new Operator("contains","contains_func")
+                    ];
+
+
         $controller->register_hook('PLUGIN_STRUCT_CONFIGPARSER_UNKNOWNKEY', 'BEFORE', $this, 'handle_plugin_struct_configparser_unknownkey');        
         $controller->register_hook('PLUGIN_STRUCT_AGGREGATIONTABLE_RENDERRESULTROW', 'BEFORE', $this, 'handle_plugin_struct_aggregationtable_renderresultrow_before');        
         $controller->register_hook('PLUGIN_STRUCT_AGGREGATIONTABLE_RENDERRESULTROW', 'AFTER', $this, 'handle_plugin_struct_aggregationtable_renderresultrow_after');
@@ -69,10 +156,11 @@ class action_plugin_conditionalstyle extends DokuWiki_Action_Plugin
 
         // Parse operator
         $operator = NULL;
-        $possible_ops = ["=","<",">","!="];
-        foreach ($possible_ops as $k => $op) {
-            if(preg_match("/\s*[a-zA-z]+\s*$op\s*[a-zA-z0-9]+\s*/",$condition)){
-                $operator = $op;
+        
+        foreach ($this->ops as $k => $op) {
+            $op_reg = $op->getReg();
+            if(preg_match("/\s*[a-zA-z]+\s*$op_reg\s*[a-zA-z0-9]+\s*/",$condition)){
+                $operator = $op_reg;
             }
         }
 
@@ -96,8 +184,8 @@ class action_plugin_conditionalstyle extends DokuWiki_Action_Plugin
         if(!isset($data['config'][$key])){
             $data['config'][$key] = [];
         }
+
         // Add command to data
-        
         $data['config'][$key][] = $config; 
     }
 
@@ -139,7 +227,6 @@ class action_plugin_conditionalstyle extends DokuWiki_Action_Plugin
             // Check if valid data was send, otherwise move to next style
             if(!$operator) continue;
 
-
             // Query struct database to get full schema info (in case the column used for condition is not displayed)
             /** @var SearchConfig $searchConfig */
             $searchConfig = $event->data['searchConfig'];
@@ -164,21 +251,7 @@ class action_plugin_conditionalstyle extends DokuWiki_Action_Plugin
                         if ($value->getColumn() === $cond_column) {
                             $row_val = $value->getRawValue();
                             // check condition
-                            $cond_applies = false;
-                            switch ($operator) {
-                                case '=':
-                                    $cond_applies = $row_val == $argument;
-                                    break;
-                                case '<':
-                                    //TODO not validated
-                                    $num_arg = floatval($argument);
-                                    $num_row_val = floatval($argument);
-                                    $cond_applies = $num_row_val < $num_arg;
-                                    break;
-                                default:
-                                    msg("condstyle: unknown operator ($operator)", -1);
-                                    break;
-                            }
+                            $cond_applies = $this->ops[$operator]->evaluate($row_val,$argument);
 
                             // store condition to inject style later
                             $this->search_configs[$searchConfig_hash][$rownum] = $cond_applies;
