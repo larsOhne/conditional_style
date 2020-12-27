@@ -1,12 +1,12 @@
 # structcondstyle Plugin for DokuWiki
 
-A small struct extension plugin that allows the user to style parts of agregations with plain CSS depending on their values.   
+A small struct extension plugin that allows the user to style parts of aggregations with plain CSS depending on their values.   
 
 All documentation for this plugin can be found at
 https://www.dokuwiki.org/plugin:structcondstyle
 
 If you install this plugin manually, make sure it is installed in
-lib/plugins/conditionalstyle/ - if the folder is called different it
+lib/plugins/structcondstyle/ - if the folder is called different it
 will not work!
 
 Please refer to http://www.dokuwiki.org/plugins for additional info
@@ -15,7 +15,7 @@ on how to install plugins in DokuWiki.
 ----
 Copyright (C) Lars Ohnemus <ohnemus.lars@gmail.com>
 
-This pluging takes a lot of inspiration from the structrowcolor plugin. Please take a look at https://dokuwiki.org/plugin:structrowcolor/  before using this plugin.
+This plugin takes a lot of inspiration from the structrowcolor plugin. Please take a look at https://dokuwiki.org/plugin:structrowcolor/  before using this plugin.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
