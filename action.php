@@ -1,9 +1,9 @@
 <?php
 /**
- * DokuWiki Plugin conditionalstyle (Action Component)
+ * DokuWiki Plugin structcondstyle (Action Component)
  *
  * @license GPL 2 http://www.gnu.org/licenses/gpl-2.0.html
- * @author  Lars Ohnemus <lars.ohnemus@mu-zero.de>
+ * @author  Lars Ohnemus <ohnemus.lars@gmail.com>
  */
 
 // must be run within Dokuwiki
@@ -11,7 +11,7 @@ if (!defined('DOKU_INC')) {
     die();
 }
 
-use dokuwiki\plugin\conditionalstyle\meta\Operator;
+use dokuwiki\plugin\structcondstyle\meta\Operator;
 
 function make_numeric($value){
     if(is_numeric($value))
@@ -85,7 +85,7 @@ function contains_func($lhs, $rhs){
 }
 
 
-class action_plugin_conditionalstyle extends DokuWiki_Action_Plugin
+class action_plugin_structcondstyle extends DokuWiki_Action_Plugin
 {
     protected $search_configs = [];
     protected $ops = [];

@@ -1,13 +1,13 @@
 <?php
 
-namespace dokuwiki\plugin\conditionalstyle\meta;
+namespace dokuwiki\plugin\structcondstyle\meta;
 
 /**
  * Class Operator
  *
  * Describes a boolean operator used to evaluate conditions
  *
- * @package  dokuwiki\plugin\conditionalstyle\meta
+ * @package  dokuwiki\plugin\structcondstyle\meta
  */
 class Operator
 {
