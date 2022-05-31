@@ -33,15 +33,12 @@ class action_plugin_structcondstyle extends DokuWiki_Action_Plugin
         $not_func = function($lhs, $rhs){return $lhs !== $rhs;};
         $in_func = function($lhs, $rhs){
             // Check if $lhs is array or string
-            if(is_array($lhs)){
-                return in_array($rhs,$lhs);
-            }else if(is_string($lhs)){
-                return strpos($lhs,$rhs) !== false;
+            if(is_string($lhs)){
+                return strpos($lhs, $rhs) !== false;
             }else return false;
             };
 
-
-
+        // Define operators
         $this->ops = [  "="         => new Operator("=", function($lhs, $rhs){return $lhs == $rhs;}),
                         "!="        => new Operator("!=", $not_func),
                         "not"       => new Operator("not", $not_func),
@@ -49,15 +46,13 @@ class action_plugin_structcondstyle extends DokuWiki_Action_Plugin
                         "<="        => new NumericOperator("<=", function($lhs, $rhs){return $lhs <= $rhs;}),
                         ">"         => new NumericOperator(">", function($lhs, $rhs){return $lhs > $rhs;}),
                         ">="        => new NumericOperator(">=", function($lhs, $rhs){return $lhs >= $rhs;}),
-                        "contains"  => new Operator("contains",$in_func),
-                        "in"  => new Operator("in",$in_func)
+                        "contains"  => new Operator("contains",$in_func)
                     ];
 
-
+        // Register hooks
         $controller->register_hook('PLUGIN_STRUCT_CONFIGPARSER_UNKNOWNKEY', 'BEFORE', $this, 'handle_plugin_struct_configparser_unknownkey');        
         $controller->register_hook('PLUGIN_STRUCT_AGGREGATIONTABLE_RENDERRESULTROW', 'BEFORE', $this, 'handle_plugin_struct_aggregationtable_renderresultrow_before');        
         $controller->register_hook('PLUGIN_STRUCT_AGGREGATIONTABLE_RENDERRESULTROW', 'AFTER', $this, 'handle_plugin_struct_aggregationtable_renderresultrow_after');
-   
     }
 
     /**
