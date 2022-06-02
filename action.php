@@ -13,6 +13,7 @@ if (!defined('DOKU_INC')) {
 
 use dokuwiki\plugin\structcondstyle\meta\Operator;
 use dokuwiki\plugin\structcondstyle\meta\NumericOperator;
+use dokuwiki\plugin\struct\meta\StructException;
 
 class action_plugin_structcondstyle extends DokuWiki_Action_Plugin
 {
@@ -187,7 +188,15 @@ class action_plugin_structcondstyle extends DokuWiki_Action_Plugin
                     /** @var Value $value */
                     foreach ($row as $colnum => $value) {
                         if ($value->getColumn() === $cond_column) {
-                            $row_val = $value->getRawValue();
+                            // Retrieve row value for comparison
+                            $row_val = NULL;
+                            try{
+                                // try to get the displayed value, which might not be available
+                                $row_val = $value->getDisplayValue();
+                            } catch (StructException $e) {
+                                // use raw value instead
+                                $row_val = $value->getRawValue();
+                            }
                             // check condition
                             $cond_applies = $this->ops[$operator]->evaluate($row_val,$argument);
 
