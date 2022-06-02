@@ -12,78 +12,8 @@ if (!defined('DOKU_INC')) {
 }
 
 use dokuwiki\plugin\structcondstyle\meta\Operator;
-
-function make_numeric($value){
-    if(is_numeric($value))
-        return floatval($value);
-    if(is_string($value)){
-        if($value == "now")
-            return time();
-        else
-            return strtotime($value);
-        
-    }
-    else
-        return FALSE;
-}
-
-function equal_func($lhs, $rhs){
-    return $lhs == $rhs;
-}
-
-function nequal_func($lhs, $rhs){
-    return !equal_func($lhs, $rhs);
-}
-
-function less_func($lhs, $rhs){
-    // Parse values to numeric
-    $lhs_num = make_numeric($lhs);
-    $rhs_num = make_numeric($rhs);
-    if($lhs_num === FALSE or $rhs_num === FALSE)
-        return false;
-    else
-        return $lhs_num < $rhs_num;
-}
-
-function leq_func($lhs, $rhs){
-    // Parse values to numeric
-    $lhs_num = make_numeric($lhs);
-    $rhs_num = make_numeric($rhs);
-    if($lhs_num === FALSE or $rhs_num === FALSE)
-        return false;
-    else
-        return $lhs_num <= $rhs_num;
-}
-
-function greater_func($lhs, $rhs){
-    // Parse values to numeric
-    $lhs_num = make_numeric($lhs);
-    $rhs_num = make_numeric($rhs);
-    if($lhs_num === FALSE or $rhs_num === FALSE)
-        return false;
-    else
-        return $lhs_num > $rhs_num;
-}
-
-function greq_func($lhs, $rhs){
-    // Parse values to numeric
-    $lhs_num = make_numeric($lhs);
-    $rhs_num = make_numeric($rhs);
-    if($lhs_num === FALSE or $rhs_num === FALSE)
-        return false;
-    else
-        return $lhs_num >= $rhs_num;
-}
-
-function contains_func($lhs, $rhs){
-    // Check if $lhs is array or string
-    if(is_array($lhs)){
-        return in_array($rhs,$lhs);
-    }else if(is_string($lhs)){
-        return strpos($lhs,$rhs) !== false;
-    }else return false;
-}
-
+use dokuwiki\plugin\structcondstyle\meta\NumericOperator;
+use dokuwiki\plugin\struct\meta\StructException;
 
 class action_plugin_structcondstyle extends DokuWiki_Action_Plugin
 {
@@ -100,21 +30,30 @@ class action_plugin_structcondstyle extends DokuWiki_Action_Plugin
      */
     public function register(Doku_Event_Handler $controller)
     {
-        $this->ops = [  "="         => new Operator("=","equal_func"),
-                        "!="        => new Operator("!=","nequal_func"),
-                        "not"       => new Operator("not","nequal_func"),
-                        "<"         => new Operator("<","less_func"),
-                        "<="        => new Operator("<=","leq_func"),
-                        ">"         => new Operator(">","greater_func"),
-                        ">="        => new Operator(">=","greq_func"),
-                        "contains"  => new Operator("contains","contains_func")
+        // Define functions that are used by multiple operators
+        $not_func = function($lhs, $rhs){return $lhs !== $rhs;};
+        $in_func = function($lhs, $rhs){
+            // Check if $lhs is array or string
+            if(is_string($lhs)){
+                return strpos($lhs, $rhs) !== false;
+            }else return false;
+            };
+
+        // Define operators
+        $this->ops = [  "="         => new Operator("=", function($lhs, $rhs){return $lhs == $rhs;}),
+                        "!="        => new Operator("!=", $not_func),
+                        "not"       => new Operator("not", $not_func),
+                        "<"         => new NumericOperator("<", function($lhs, $rhs){return $lhs < $rhs;}),
+                        "<="        => new NumericOperator("<=", function($lhs, $rhs){return $lhs <= $rhs;}),
+                        ">"         => new NumericOperator(">", function($lhs, $rhs){return $lhs > $rhs;}),
+                        ">="        => new NumericOperator(">=", function($lhs, $rhs){return $lhs >= $rhs;}),
+                        "contains"  => new Operator("contains",$in_func)
                     ];
 
-
+        // Register hooks
         $controller->register_hook('PLUGIN_STRUCT_CONFIGPARSER_UNKNOWNKEY', 'BEFORE', $this, 'handle_plugin_struct_configparser_unknownkey');        
         $controller->register_hook('PLUGIN_STRUCT_AGGREGATIONTABLE_RENDERRESULTROW', 'BEFORE', $this, 'handle_plugin_struct_aggregationtable_renderresultrow_before');        
         $controller->register_hook('PLUGIN_STRUCT_AGGREGATIONTABLE_RENDERRESULTROW', 'AFTER', $this, 'handle_plugin_struct_aggregationtable_renderresultrow_after');
-   
     }
 
     /**
@@ -249,7 +188,15 @@ class action_plugin_structcondstyle extends DokuWiki_Action_Plugin
                     /** @var Value $value */
                     foreach ($row as $colnum => $value) {
                         if ($value->getColumn() === $cond_column) {
-                            $row_val = $value->getRawValue();
+                            // Retrieve row value for comparison
+                            $row_val = NULL;
+                            try{
+                                // try to get the displayed value, which might not be available
+                                $row_val = $value->getDisplayValue();
+                            } catch (StructException $e) {
+                                // use raw value instead
+                                $row_val = $value->getRawValue();
+                            }
                             // check condition
                             $cond_applies = $this->ops[$operator]->evaluate($row_val,$argument);
 
